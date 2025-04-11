@@ -1,5 +1,5 @@
 streamlit==1.28.0
-tensorflow==2.12.0
+tensorflow==2.16.1
 numpy==1.24.3
 pillow==9.5.0
 matplotlib==3.7.1
