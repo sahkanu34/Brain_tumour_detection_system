@@ -3,4 +3,4 @@ tensorflow==2.16.1
 numpy==1.26.4  # Updated to match TensorFlow 2.16.1's requirements
 pillow==9.5.0
 matplotlib==3.7.1
-scikit-learn==1.2.2
+keras==2.16.0
