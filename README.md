@@ -1,4 +1,6 @@
 # 🧠 Brain Tumour Detection System
+A machine learning-powered web application that detects brain tumors from MRI scans. 
+The system uses deep learning techniques to classify MRI images into tumor or non-tumor categories, helping in early diagnosis and better treatment planning.
 
 ## 📸 Screenshots
 # 
@@ -8,8 +10,8 @@
 <img src= "https://github.com/sahkanu34/Brain_tumour_detection_system/blob/main/screenshots/results.png?raw=true" >
 
 ---
-# Checkout the Live Demo app
-[!Streamlit] (https://braintumourdetectionsystem-34.streamlit.app/)
+## 🚀 Checkout the Live Demo App  
+[🔗 Streamlit App](https://braintumourdetectionsystem-34.streamlit.app/)
 
 
 # 🧠 Streamlit Deployment Instructions
@@ -38,7 +40,7 @@ brain-tumor-classifier/
 
 1. Create a new GitHub repository (e.g., `brain-tumor-classifier`)
 2. Upload all the files in this project to your repository:
-    - `app.py` (your main Streamlit application)
+    - `app/app.py` (your main Streamlit application)
     - `requirements.txt` (dependencies with specific versions)
     - `runtime.txt` (specifies Python 3.10.12)
     - `notebooks/model_training.ipynb` (train and export the model)
