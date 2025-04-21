@@ -3,10 +3,14 @@ import numpy as np
 from PIL import Image
 import tensorflow as tf
 from tensorflow.keras.preprocessing import image
+from tensorflow.keras.preprocessing.image import img_to_array
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 import plotly.express as px
 import plotly.graph_objects as go
 import time
 import os
+import pandas as pd
+import random
 
 # Set page config
 st.set_page_config(
@@ -43,6 +47,13 @@ st.markdown("""
         border-left: 5px solid #f39c12;
         background-color: #fef9e7;
         border-radius: 5px;
+    }
+    .dashboard-card {
+        padding: 1rem;
+        border-radius: 10px;
+        background-color: #ffffff;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 1rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -94,13 +105,50 @@ severity_level = {
     3: "Medium"  # Pituitary
 }
 
+# Generate synthetic data for dashboard
+def generate_synthetic_data():
+    # Age distribution data
+    age_groups = ['0-20', '21-40', '41-60', '61-80', '80+']
+    
+    # Synthetic patient records
+    patients = []
+    for i in range(100):
+        tumor_type = random.choice(list(class_names.keys()))
+        age_group = random.choice(age_groups)
+        gender = random.choice(['Male', 'Female'])
+        survival_years = random.randint(1, 10) if tumor_type != 2 else None
+        patients.append({
+            'Patient ID': i+1000,
+            'Age Group': age_group,
+            'Gender': gender,
+            'Tumor Type': class_names[tumor_type],
+            'Survival Years': survival_years,
+            'Treatment': random.choice(['Surgery', 'Radiation', 'Chemo', 'Observation'])
+        })
+    
+    return pd.DataFrame(patients)
+
 # Preprocess the image
+
 def preprocess_image(img):
+    img = img.convert("RGB")  # Ensure 3 channels
     img = img.resize((128, 128))
     img_array = image.img_to_array(img)
     img_array = np.expand_dims(img_array, axis=0)
-    img_array /= 255.0
+    img_array = preprocess_input(img_array)  # 🔥 Use MobileNetV2-specific preprocessing
     return img_array
+
+
+def is_mri_image(img):
+    img = img.convert("RGB")
+    np_img = np.array(img)
+
+    r, g, b = np_img[:,:,0], np_img[:,:,1], np_img[:,:,2]
+    color_diff = np.abs(r - g) + np.abs(r - b) + np.abs(g - b)
+    grayscale_score = np.mean(color_diff)
+
+    return grayscale_score < 15 
+
 
 # Create plotly bar chart for prediction probabilities
 def create_probability_chart(predictions):
@@ -147,6 +195,135 @@ def create_gauge_chart(confidence):
     fig.update_layout(height=250)
     return fig
 
+# Create tumor distribution pie chart
+def create_tumor_distribution_chart(df):
+    tumor_counts = df['Tumor Type'].value_counts().reset_index()
+    tumor_counts.columns = ['Tumor Type', 'Count']
+    
+    fig = px.pie(
+        tumor_counts, 
+        values='Count', 
+        names='Tumor Type',
+        title='Tumor Type Distribution',
+        hole=0.3,
+        color='Tumor Type',
+        color_discrete_map={
+            'Glioma Tumor': '#FF9999',     # Light red
+            'Meningioma Tumor': '#66B2FF', # Light blue
+            'Pituitary Tumor': '#99FF99',  # Light green
+            'No Tumor': '#FFCC99'          # Light orange
+        }
+    )
+    fig.update_traces(textposition='inside', textinfo='percent+label')
+    fig.update_layout(showlegend=False)
+    return fig
+
+# Create age distribution chart
+def create_age_distribution_chart(df):
+    # Using a different color palette - you can choose any of these options:
+    # 'Viridis', 'Plasma', 'Inferno', 'Magma', 'Cividis', 'Turbo'
+    # 'Set1', 'Set2', 'Set3', 'Pastel1', 'Pastel2'
+    # 'Paired', 'Dark2', 'Spectral', 'RdYlBu'
+    
+    fig = px.histogram(
+        df, 
+        x='Age Group', 
+        color='Tumor Type',
+        title='Age Distribution by Tumor Type',
+        barmode='group',
+        color_discrete_sequence=px.colors.qualitative.Vivid,  # Using Set3 palette
+        # Alternative color map:
+        # color_discrete_map={
+        #     'Glioma Tumor': '#E8396F',      # Rose
+        #     'Meningioma Tumor': '#44B3C2',  # Teal
+        #     'Pituitary Tumor': '#A0D568',   # Lime
+        #     'No Tumor': '#FCBB6D'           # Orange
+        # }
+    )
+    fig.update_layout(
+        xaxis_title='Age Group',
+        yaxis_title='Number of Cases',
+        height=400,
+        bargap=0.2  # Adjust gap between bars
+    )
+    return fig
+
+# Create survival analysis chart
+def create_survival_chart(df):
+    # Filter out 'No Tumor' cases
+    tumor_df = df[df['Tumor Type'] != 'No Tumor']
+    
+    if tumor_df.empty:
+        return None
+    
+    fig = px.box(
+        tumor_df,
+        x='Tumor Type',
+        y='Survival Years',
+        color='Tumor Type',
+        title='Survival Years by Tumor Type',
+        color_discrete_map={
+            'Glioma Tumor': '#636EFA',
+            'Meningioma Tumor': '#EF553B',
+            'Pituitary Tumor': '#00CC96'
+        }
+    )
+    fig.update_layout(
+        xaxis_title='Tumor Type',
+        yaxis_title='Survival Years',
+        height=400,
+        showlegend=False
+    )
+    return fig
+
+# Create treatment distribution chart
+def create_treatment_chart(df):
+    # Filter out 'No Tumor' cases
+    tumor_df = df[df['Tumor Type'] != 'No Tumor']
+    
+    if tumor_df.empty:
+        return None
+    
+    treatment_counts = tumor_df.groupby(['Tumor Type', 'Treatment']).size().reset_index(name='Count')
+    
+    fig = px.bar(
+        treatment_counts,
+        x='Tumor Type',
+        y='Count',
+        color='Treatment',
+        title='Treatment Distribution by Tumor Type',
+        barmode='group'
+    )
+    fig.update_layout(
+        xaxis_title='Tumor Type',
+        yaxis_title='Number of Cases',
+        height=400
+    )
+    return fig
+
+# Create gender distribution chart
+def create_gender_chart(df):
+    gender_counts = df.groupby(['Tumor Type', 'Gender']).size().reset_index(name='Count')
+    
+    fig = px.bar(
+        gender_counts,
+        x='Tumor Type',
+        y='Count',
+        color='Gender',
+        title='Gender Distribution by Tumor Type',
+        barmode='group',
+        color_discrete_map={
+            'Male': '#3498db',
+            'Female': '#e74c3c'
+        }
+    )
+    fig.update_layout(
+        xaxis_title='Tumor Type',
+        yaxis_title='Number of Cases',
+        height=400
+    )
+    return fig
+
 # Main app function
 def main():
     st.markdown('<h1 class="main-header">🧠 Brain Tumor Classification using Deep Learning</h1>', unsafe_allow_html=True)
@@ -156,8 +333,11 @@ def main():
         st.error("⚠️ Model could not be loaded. Please check if the model file exists in the correct directory.")
         st.info("For demonstration purposes, the app will continue with simulated predictions.")
     
+    # Generate synthetic data for dashboard
+    patient_data = generate_synthetic_data()
+    
     # Create tabs
-    tab1, tab2, tab3 = st.tabs(["📊 Classification", "ℹ️ About Tumors", "📘 How It Works"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Classification", "📈 Analytics Dashboard", "ℹ️ About Tumors", "📘 How It Works"])
     
     with tab1:
         st.markdown('<div class="card">', unsafe_allow_html=True)
@@ -177,6 +357,10 @@ def main():
             with col2:
                 # Show processing animation
                 with st.spinner("Processing image..."):
+                    if  not is_mri_image(image_display):
+                        st.error("⚠️ The uploaded image does not appear to be an MRI scan. Please upload a valid MRI image.")
+                        st.stop()
+                    
                     # Preprocess and predict
                     processed_image = preprocess_image(image_display)
                     
@@ -236,6 +420,85 @@ def main():
     
     with tab2:
         st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown('<h2 class="sub-header">Brain Tumor Analytics Dashboard</h2>', unsafe_allow_html=True)
+        
+        # KPI Cards
+        st.markdown("### Key Metrics")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+            total_cases = len(patient_data)
+            st.metric("Total Cases", total_cases)
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+            tumor_cases = len(patient_data[patient_data['Tumor Type'] != 'No Tumor'])
+            st.metric("Tumor Cases", tumor_cases, f"{tumor_cases/total_cases*100:.1f}% of total")
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+            avg_survival = patient_data[patient_data['Tumor Type'] != 'No Tumor']['Survival Years'].mean()
+            st.metric("Avg Survival (Years)", f"{avg_survival:.1f}" if not np.isnan(avg_survival) else "N/A")
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        with col4:
+            st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+            common_tumor = patient_data['Tumor Type'].value_counts().idxmax()
+            st.metric("Most Common Tumor", common_tumor)
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        # First row of charts
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+            st.plotly_chart(create_tumor_distribution_chart(patient_data), use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+            st.plotly_chart(create_age_distribution_chart(patient_data), use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Second row of charts
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+            survival_chart = create_survival_chart(patient_data)
+            if survival_chart:
+                st.plotly_chart(survival_chart, use_container_width=True)
+            else:
+                st.warning("No survival data available for 'No Tumor' cases")
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+            treatment_chart = create_treatment_chart(patient_data)
+            if treatment_chart:
+                st.plotly_chart(treatment_chart, use_container_width=True)
+            else:
+                st.warning("No treatment data available for 'No Tumor' cases")
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Third row - gender distribution
+        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+        st.plotly_chart(create_gender_chart(patient_data), use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Raw data table
+        st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
+        st.markdown("### Patient Data Overview")
+        st.dataframe(patient_data.head(20), use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    with tab3:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
         st.markdown("## Brain Tumor Types")
         
         # Create expandable sections for each tumor type
@@ -286,7 +549,7 @@ def main():
                         st.plotly_chart(fig, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
                         
-    with tab3:
+    with tab4:
         st.markdown('<div class="card">', unsafe_allow_html=True)
         st.markdown("## How the Classification Works")
         
@@ -445,16 +708,15 @@ with st.sidebar:
     with sample_tab1:
         st.markdown("##### Glioma Tumor")
         st.markdown(
-        """
-        <div style="background-color: #f0f0f0; width: 128px; height: 128px; 
+            """
+            <div style="background-color: #f0f0f0; width: 150px; height: 150px; 
             border-radius: 5px; display: flex; align-items: center; justify-content: center;">
-            <img src="images/Tr-pi_0013.jpg" alt="Image" style="max-width: 100%; max-height: 100%; border-radius: 5px;">
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    
+                <span style="color: #666;">MRI Sample</span>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+        
     with sample_tab2:
         st.markdown("##### Meningioma Tumor")
         st.markdown(
