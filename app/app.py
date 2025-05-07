@@ -14,7 +14,7 @@ import random
 
 # Set page config
 st.set_page_config(
-    page_title="Brain Tumor Classifier",
+    page_title="Neuroscan AI",
     page_icon=":brain:",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -135,7 +135,7 @@ def preprocess_image(img):
     img = img.resize((128, 128))
     img_array = image.img_to_array(img)
     img_array = np.expand_dims(img_array, axis=0)
-    img_array = preprocess_input(img_array)  # 🔥 Use MobileNetV2-specific preprocessing
+    img_array = preprocess_input(img_array)  # Preprocess for MobileNetV2
     return img_array
 
 
@@ -326,7 +326,7 @@ def create_gender_chart(df):
 
 # Main app function
 def main():
-    st.markdown('<h1 class="main-header">🧠 Brain Tumor Classification using Deep Learning</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🧠 Neruo Scan AI</h1>', unsafe_allow_html=True)
     
     # Check if model loaded properly
     if not model_loaded:
@@ -337,7 +337,7 @@ def main():
     patient_data = generate_synthetic_data()
     
     # Create tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["📊 Classification", "📈 Analytics Dashboard", "ℹ️ About Tumors", "📘 How It Works"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🔎 Detection", "📈 Analytics Dashboard", "ℹ️ About Tumors", "📘 How It Works"])
     
     with tab1:
         st.markdown('<div class="card">', unsafe_allow_html=True)
@@ -680,7 +680,8 @@ def main():
 with st.sidebar:
     # Use emoji instead of image to avoid path issues
     st.markdown("🧠", unsafe_allow_html=True)
-    st.title("Brain Tumor Classifier")
+    st.title("Early Detection of Brain Tumors")
+    st.markdown("### A Deep Learning Approach")
     
     st.markdown("---")
     
