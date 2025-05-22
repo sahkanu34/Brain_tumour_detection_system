@@ -61,13 +61,21 @@ st.markdown("""
 # Load the trained model
 @st.cache_resource
 def load_model():
-    model = tf.keras.models.load_model('models/brain_tumor_classifier.h5')
-    return model
+    try:
+        model = tf.keras.models.load_model('models/brain_tumor_classifier.h5')
+        return model
+    except FileNotFoundError:
+        st.error("Model file not found at 'models/brain_tumor_classifier.h5'. Please ensure the model file exists.")
+        return None
+    except Exception as e:
+        st.error(f"Error loading model: {str(e)}")
+        return None
 
 try:
     model = load_model()
-    model_loaded = True
-except:
+    model_loaded = model is not None
+except Exception as e:
+    st.error(f"Unexpected error during model loading: {str(e)}")
     model_loaded = False
 
 # Class labels
@@ -326,7 +334,7 @@ def create_gender_chart(df):
 
 # Main app function
 def main():
-    st.markdown('<h1 class="main-header">🧠 Neruo Scan AI</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🧠 Neuro Scan AI</h1>', unsafe_allow_html=True)
     
     # Check if model loaded properly
     if not model_loaded:
