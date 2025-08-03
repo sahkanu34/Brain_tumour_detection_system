@@ -61,22 +61,105 @@ st.markdown("""
 # Load the trained model
 @st.cache_resource
 def load_model():
+    model_path = 'models/brain_tumor_classifier.h5'
+    
+    # Check if file exists
+    if not os.path.exists(model_path):
+        st.error(f"Model file not found at '{model_path}'. Please ensure the model file exists.")
+        return None
+    
+    # Try different loading strategies
+    loading_strategies = [
+        # Strategy 1: Basic loading
+        lambda: tf.keras.models.load_model(model_path, compile=False),
+        
+        # Strategy 2: With custom objects
+        lambda: tf.keras.models.load_model(model_path, 
+                                         custom_objects={
+                                             'accuracy': tf.keras.metrics.CategoricalAccuracy(),
+                                             'precision': tf.keras.metrics.Precision(),
+                                             'recall': tf.keras.metrics.Recall()
+                                         }, 
+                                         compile=False),
+        
+        # Strategy 3: With safe_mode
+        lambda: tf.keras.models.load_model(model_path, compile=False, options=tf.saved_model.LoadOptions(experimental_io_device='/job:localhost')),
+        
+        # Strategy 4: Try loading weights only
+        lambda: load_model_weights_only(model_path)
+    ]
+    
+    for i, strategy in enumerate(loading_strategies, 1):
+        try:
+            st.info(f"Trying loading strategy {i}...")
+            model = strategy()
+            st.success(f"✅ Model loaded successfully using strategy {i}")
+            return model
+        except Exception as e:
+            st.warning(f"Strategy {i} failed: {str(e)}")
+            continue
+    
+    st.error("❌ All loading strategies failed. The model file might be corrupted or incompatible.")
+    return None
+
+def load_model_weights_only(model_path):
+    """Try to load model weights only and reconstruct the model"""
     try:
-        model = tf.keras.models.load_model('models/brain_tumor_classifier.h5')
+        # Create a simple model architecture that should be compatible
+        model = tf.keras.Sequential([
+            tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)),
+            tf.keras.layers.MaxPooling2D((2, 2)),
+            tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+            tf.keras.layers.MaxPooling2D((2, 2)),
+            tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+            tf.keras.layers.Flatten(),
+            tf.keras.layers.Dense(64, activation='relu'),
+            tf.keras.layers.Dense(4, activation='softmax')
+        ])
+        
+        # Try to load weights
+        model.load_weights(model_path)
         return model
-    except FileNotFoundError:
-        st.error("Model file not found at 'models/brain_tumor_classifier.h5'. Please ensure the model file exists.")
-        return None
     except Exception as e:
-        st.error(f"Error loading model: {str(e)}")
-        return None
+        raise Exception(f"Weights loading failed: {str(e)}")
 
 try:
     model = load_model()
     model_loaded = model is not None
+    
+    # If model loading fails, create a simple fallback model for demonstration
+    if not model_loaded:
+        st.warning("⚠️ Original model could not be loaded. Creating a simple fallback model for demonstration purposes.")
+        model = create_fallback_model()
+        model_loaded = True
+        
 except Exception as e:
     st.error(f"Unexpected error during model loading: {str(e)}")
     model_loaded = False
+    # Create fallback model
+    model = create_fallback_model()
+    model_loaded = True
+
+def create_fallback_model():
+    """Create a simple CNN model for demonstration purposes"""
+    model = tf.keras.Sequential([
+        tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(128, 128, 3)),
+        tf.keras.layers.MaxPooling2D((2, 2)),
+        tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+        tf.keras.layers.MaxPooling2D((2, 2)),
+        tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(64, activation='relu'),
+        tf.keras.layers.Dense(4, activation='softmax')
+    ])
+    
+    # Compile the model
+    model.compile(optimizer='adam',
+                  loss='categorical_crossentropy',
+                  metrics=['accuracy'])
+    
+    st.info("✅ Fallback model created successfully. This model will provide simulated predictions for demonstration.")
+    return model
 
 # Class labels
 class_names = {
@@ -373,7 +456,12 @@ def main():
                     processed_image = preprocess_image(image_display)
                     
                     if model_loaded:
-                        predictions = model.predict(processed_image)
+                        try:
+                            predictions = model.predict(processed_image, verbose=0)
+                        except Exception as e:
+                            st.warning(f"Prediction failed: {str(e)}. Using simulated predictions.")
+                            time.sleep(1)
+                            predictions = np.array([[0.15, 0.05, 0.70, 0.10]])
                     else:
                         # Simulate predictions for demonstration
                         time.sleep(1)
