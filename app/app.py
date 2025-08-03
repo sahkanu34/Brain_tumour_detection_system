@@ -61,29 +61,15 @@ st.markdown("""
 # Load the trained model
 @st.cache_resource
 def load_model():
-    # Try multiple possible paths for the model file
-    possible_paths = [
-        'app/models/brain_tumor_classifier.h5',
-        'models/brain_tumor_classifier.h5',
-        '../models/brain_tumor_classifier.h5',
-        './models/brain_tumor_classifier.h5'
-    ]
-    
-    for model_path in possible_paths:
-        try:
-            model = tf.keras.models.load_model(model_path)
-            st.success(f"✅ Model loaded successfully")
-            return model
-        except FileNotFoundError:
-            continue
-        except Exception as e:
-            st.error(f"Error loading model from {model_path}: {str(e)}")
-            continue
-    
-    st.error("❌ Model file not found. Please ensure the model file exists in one of these locations:")
-    for path in possible_paths:
-        st.error(f"  - {path}")
-    return None
+    try:
+        model = tf.keras.models.load_model('models/brain_tumor_classifier.h5')
+        return model
+    except FileNotFoundError:
+        st.error("Model file not found at 'models/brain_tumor_classifier.h5'. Please ensure the model file exists.")
+        return None
+    except Exception as e:
+        st.error(f"Error loading model: {str(e)}")
+        return None
 
 try:
     model = load_model()
@@ -254,7 +240,7 @@ def create_age_distribution_chart(df):
         title='Age Distribution by Tumor Type',
         barmode='group',
         color_discrete_sequence=px.colors.qualitative.Vivid,  # Using Set3 palette
-        # Alternative_color map:
+        # Alternative color map:
         # color_discrete_map={
         #     'Glioma Tumor': '#E8396F',      # Rose
         #     'Meningioma Tumor': '#44B3C2',  # Teal
